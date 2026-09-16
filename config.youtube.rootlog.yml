@@ -1,0 +1,212 @@
+settings:
+  log_directory: "log"
+  cache_directory: "runtime/youtube/cache"
+  state_directory: "runtime/youtube/state"
+
+actors:
+  channel:
+    config:
+      db_path: "runtime/youtube/db"
+    entities:
+      - name: "youtube keyword search"
+        url: "https://www.youtube.com/results?search_query=YouTube"
+        keywords_file: "keywords.txt"
+        keywords_per_update: 5
+        env_file: ".env"
+        cookie_env: "YouTube_cookie"
+        max_age_hours: 24
+        update_interval: 900
+        quiet_first_time: true
+        max_continuation_depth: 1
+
+      - name: youtube APEC search
+        url: https://www.youtube.com/results?search_query=APEC
+        keywords_file: keywords.apec.txt
+        keywords_per_update: 1
+        env_file: .env
+        cookie_env: YouTube_cookie
+        max_age_hours: 24
+        update_interval: 900
+        quiet_first_time: true
+        max_continuation_depth: 1
+  youtube.community:
+    config:
+      db_path: "runtime/youtube/db"
+    entities:
+      - name: "jintsumi community posts"
+        url: "https://www.youtube.com/@jintsumi/posts"
+        env_file: ".env"
+        cookie_env: "YouTube_cookie"
+        update_interval: 300
+        quiet_first_time: true
+        max_continuation_depth: 0
+
+  filter.match:
+    entities:
+      - name: "youtube keywords"
+        patterns_file: "keywords.txt"
+        fields:
+          - "title"
+          - "summary"
+          - "author"
+
+      - name: apec keyword
+        patterns_file: keywords.apec.txt
+        fields:
+          - title
+          - summary
+          - author
+  filter.deduplicate:
+    entities:
+      - name: "youtube video deduplicate"
+        field: "video_id"
+
+      - name: apec video deduplicate
+        field: video_id
+  minimax.analyze:
+    config:
+      env_file: ".env"
+      consumption_delay: 1
+    entities:
+      - name: "anti-china review"
+        keywords_file: "keywords.txt"
+        min_confidence: 0.65
+      - name: "apec anti-china review"
+        keywords_file: "keywords.apec.txt"
+        min_confidence: 0.65
+        analysis_mode: "apec_risk"
+        source_name: "YouTube"
+        source_url: "https://www.youtube.com/results?search_query=APEC"
+      - name: "jintsumi community analysis"
+        analysis_mode: "profile_update"
+        source_name: "@jintsumi"
+        source_url: "https://www.youtube.com/@jintsumi/posts"
+        min_confidence: 0
+
+  mattermost:
+    config:
+      base_url: "https://kan.cool"
+      env_file: ".env"
+    entities:
+      - name: "kan keyword groups"
+        token_env: "YOUTUBE_AGENT_COLLECTOR_TOKEN"
+        channels:
+          - "riro3ne5kbyqjgcwooedszrhyc"
+          - "ta9wr1uag7n6mjax6hyaf8dndc"
+          - "ky5cpcp7z3dhbb7kasg5ou63fa"
+          - "yp6o8eykbpgw3f5m1j3895dfhh"
+          - "49e5k748p3gx9neqfxyq7ij15c"
+        message_template: &youtube_keyword_template "命中关键词：{matched_keywords}\n\n推送原因：{push_reason}\n\n原YouTube链接：{url}"
+      - name: "youtube key accounts agent"
+        token_env: "YOUTUBE_AGENT_KEY_ACCOUNTS_TOKEN"
+        channels:
+          - "riro3ne5kbyqjgcwooedszrhyc"
+          - "ta9wr1uag7n6mjax6hyaf8dndc"
+          - "ky5cpcp7z3dhbb7kasg5ou63fa"
+          - "yp6o8eykbpgw3f5m1j3895dfhh"
+          - "49e5k748p3gx9neqfxyq7ij15c"
+        message_template: *youtube_keyword_template
+      - name: "youtube hotspots agent"
+        token_env: "YOUTUBE_AGENT_HOTSPOTS_TOKEN"
+        channels:
+          - "riro3ne5kbyqjgcwooedszrhyc"
+          - "ta9wr1uag7n6mjax6hyaf8dndc"
+          - "ky5cpcp7z3dhbb7kasg5ou63fa"
+          - "yp6o8eykbpgw3f5m1j3895dfhh"
+          - "49e5k748p3gx9neqfxyq7ij15c"
+        message_template: *youtube_keyword_template
+      - name: "youtube analyst agent"
+        token_env: "YOUTUBE_AGENT_ANALYST_TOKEN"
+        channels:
+          - "riro3ne5kbyqjgcwooedszrhyc"
+          - "ta9wr1uag7n6mjax6hyaf8dndc"
+          - "ky5cpcp7z3dhbb7kasg5ou63fa"
+          - "yp6o8eykbpgw3f5m1j3895dfhh"
+          - "49e5k748p3gx9neqfxyq7ij15c"
+        message_template: *youtube_keyword_template
+      - name: "jintsumi key person group"
+        channel_env: "JINTSUMI_MATTERMOST_CHANNEL_ID"
+        token_env: "JINTSUMI_MATTERMOST_BOT_TOKEN"
+        message_template: "**@jintsumi 重点人员监控**\n\n来源网址：{source_url}\n原文链接：{url}\n\
+          发布时间：{published_text}\n作者：{author}\n\n原文内容：\n{content}\n\nAI 摘要：\n{ai_summary}\n\
+          \n关键信息：\n{ai_key_points}\n\n风险等级：{ai_risk_level}\n关注建议：{ai_recommendation}\n\
+          \nAI 判断依据：\n{push_reason}"
+      - name: apec keyword group
+        channel_env: APEC_MATTERMOST_CHANNEL_ID
+        token_env: APEC_MATTERMOST_BOT_TOKEN
+        message_template: |
+          🚨【APEC 风险预警】
+
+          等级：{risk_level}
+          风险类型（研判分类）：{risk_type}
+
+          事件：
+          {title}
+
+          原始抓取信息：
+          - 平台：{source_platform}
+          - 频道/作者：{author}
+          - 原始平台发布时间：{published_text}
+          - 原始来源：{url}
+
+          监控信号：
+          - 命中关键词：{matched_keywords}
+          - 程序发现时间：{observed_at}
+          - 当前来源数：{source_count} 条（{source_platform}）
+          - 跨平台统计：{cross_platform_count} 个
+          - 当前传播阶段：{spread_stage}
+          - 数据说明：{statistical_note}
+
+          风险叙事：
+          {risk_narrative}
+
+          涉及范围：
+          {impact_scope}
+
+          风险研判依据（仅基于上述抓取信息）：
+          {push_reason}
+
+          未来 6 小时：
+          {forecast_note}
+
+          建议关注：
+          {recommendation}
+
+          原始来源：
+          {url}
+
+          检索来源：
+          {source_url}
+chains:
+  "youtube keyword monitor":
+    - channel:
+        - "youtube keyword search"
+    - filter.match:
+        - "youtube keywords"
+    - filter.deduplicate:
+        - "youtube video deduplicate"
+    - minimax.analyze:
+        - "anti-china review"
+    - mattermost:
+        - "kan keyword groups"
+        - "youtube key accounts agent"
+        - "youtube hotspots agent"
+        - "youtube analyst agent"
+  "jintsumi community monitor":
+    - youtube.community:
+        - "jintsumi community posts"
+    - minimax.analyze:
+        - "jintsumi community analysis"
+    - mattermost:
+        - "jintsumi key person group"
+  apec keyword monitor:
+    - channel:
+        - youtube APEC search
+    - filter.match:
+        - apec keyword
+    - filter.deduplicate:
+        - apec video deduplicate
+    - minimax.analyze:
+        - apec anti-china review
+    - mattermost:
+        - apec keyword group

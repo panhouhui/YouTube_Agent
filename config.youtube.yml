@@ -1,0 +1,69 @@
+settings:
+  log_directory: "runtime/youtube/logs"
+  cache_directory: "runtime/youtube/cache"
+  state_directory: "runtime/youtube/state"
+
+actors:
+  channel:
+    config:
+      db_path: "runtime/youtube/db"
+    entities:
+      - name: "youtube keyword search"
+        url: "https://www.youtube.com/results?search_query=YouTube"
+        keywords_file: "keywords.txt"
+        keywords_per_update: 5
+        env_file: ".env"
+        cookie_env: "YouTube_cookie"
+        max_age_hours: 24
+        update_interval: 900
+        quiet_first_time: true
+        max_continuation_depth: 1
+
+  filter.match:
+    entities:
+      - name: "youtube keywords"
+        patterns_file: "keywords.txt"
+        fields:
+          - "title"
+          - "summary"
+          - "author"
+
+  filter.deduplicate:
+    entities:
+      - name: "youtube video deduplicate"
+        field: "video_id"
+
+  minimax.analyze:
+    config:
+      env_file: ".env"
+      consumption_delay: 1
+    entities:
+      - name: "anti-china review"
+        keywords_file: "keywords.txt"
+        min_confidence: 0.65
+
+  mattermost:
+    config:
+      base_url: "https://kan.cool"
+      env_file: ".env"
+    entities:
+      - name: "kan keyword groups"
+        channels:
+          - "riro3ne5kbyqjgcwooedszrhyc"
+          - "ta9wr1uag7n6mjax6hyaf8dndc"
+          - "ky5cpcp7z3dhbb7kasg5ou63fa"
+          - "yp6o8eykbpgw3f5m1j3895dfhh"
+        message_template: "命中关键词：{matched_keywords}\n\n推送原因：{push_reason}\n\n原YouTube链接：{url}"
+
+chains:
+  "youtube keyword monitor":
+    - channel:
+        - "youtube keyword search"
+    - filter.match:
+        - "youtube keywords"
+    - filter.deduplicate:
+        - "youtube video deduplicate"
+    - minimax.analyze:
+        - "anti-china review"
+    - mattermost:
+        - "kan keyword groups"

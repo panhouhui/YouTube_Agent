@@ -1,0 +1,57 @@
+actors:
+  utils.producer:
+    entities:
+      - name: producer1
+      - name: producer2
+      - name: producer3
+  utils.consumer:
+    entities:
+      - name: consumer1
+      - name: consumer2
+      - name: consumer3
+  filter.format:
+    entities:
+      - name: formatter
+        template: '[x] {text}'
+
+chains:
+  chain1:
+    - utils.producer:
+        - producer1
+    - filter.format:
+        - formatter
+    - utils.consumer:
+        - consumer1
+  chain2:
+    - utils.producer:
+        - producer2
+    - filter.format:
+        - formatter
+    - utils.consumer:
+        - consumer2
+  chain3a:
+    - filter.format:
+        - formatter
+    - utils.consumer:
+        - consumer3
+  chain3b:
+    - utils.producer:
+        - producer3
+    - utils.consumer:
+        - consumer3
+
+testcases:
+  senders:
+    - entity: producer1
+      records: ['record1']
+    - entity: producer2
+      records: ['record2']
+    - entity: producer3
+      records: ['record3']
+  receivers:
+    - entity: consumer1
+      expected_history: ['[x] record1']
+    - entity: consumer2
+      expected_history: ['[x] record2']
+    - entity: consumer3
+      expected_history: ['record3']

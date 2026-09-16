@@ -74,6 +74,13 @@ def get_continuation_token(data: Union[dict, list]) -> Optional[str]:
     return token
 
 
+def get_continuation_api_url(data: Union[dict, list]) -> Optional[str]:
+    api_url = find_one(data, '$..commandMetadata.webCommandMetadata.apiUrl')
+    if not isinstance(api_url, str) or not api_url:
+        return None
+    return api_url
+
+
 def extract_keys(page: str, keys: List[str], anchor: str = '') -> Tuple[Dict[str, list], dict]:
     pos_start = page.find(anchor)
     if pos_start == -1:
@@ -125,6 +132,7 @@ class NextPageContext(BaseModel):
     innertube_context: Optional[dict]
     session_index: str
     continuation_token: Optional[str] = None
+    continuation_api_url: Optional[str] = None
 
 
 CLIENT_VERSION = '2.20231023.04.02'
@@ -132,9 +140,17 @@ CLIENT_VERSION = '2.20231023.04.02'
 def prepare_next_page_request(innertube_context: Optional[dict],
                               continuation_token: str,
                               cookies: Optional[AnotherCookieJar]=None,
-                              session_index: str = '') -> Tuple[str, dict, dict]:
-    BROWSE_ENDPOINT = 'https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
-    cookies = cookies or AnotherAiohttpCookieJar(aiohttp.CookieJar())
+                              session_index: str = '',
+                              api_url: Optional[str] = None) -> Tuple[str, dict, dict]:
+    INNERTUBE_API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
+    api_url = api_url or '/youtubei/v1/browse'
+    if api_url.startswith('/'):
+        endpoint = f'https://www.youtube.com{api_url}?key={INNERTUBE_API_KEY}'
+    elif api_url.startswith('https://www.youtube.com/'):
+        separator = '&' if '?' in api_url else '?'
+        endpoint = f'{api_url}{separator}key={INNERTUBE_API_KEY}'
+    else:
+        endpoint = f'https://www.youtube.com/youtubei/v1/browse?key={INNERTUBE_API_KEY}'
     innertube_context = innertube_context or {}
 
     visitor_data = find_one(innertube_context, '$..visitorData') or ''
@@ -150,7 +166,7 @@ def prepare_next_page_request(innertube_context: Optional[dict],
         'X-Youtube-Client-Version': client_version,
         'Content-Type': 'application/json'
     }
-    sapisid = cookies.get('SAPISID')
+    sapisid = cookies.get('SAPISID') if cookies is not None else None
     if sapisid is not None:
         headers['Authorization'] = get_auth_header(sapisid)
 
@@ -170,7 +186,7 @@ def prepare_next_page_request(innertube_context: Optional[dict],
         },
         'continuation': continuation_token
     }
-    return BROWSE_ENDPOINT, headers, post_body
+    return endpoint, headers, post_body
 
 
 def parse_navigation_endpoint(run: dict) -> str:

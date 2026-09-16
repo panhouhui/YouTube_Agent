@@ -15,6 +15,7 @@ from avtdl.plugins.mattermost.mattermost import load_env_file
 from avtdl.plugins.youtube.common import (
     NextPageContext,
     extract_keys,
+    get_continuation_api_url,
     get_continuation_token,
     get_innertube_context,
     get_session_index,
@@ -199,13 +200,14 @@ class YoutubeCommunityMonitor(PagedFeedMonitor):
         if raw_page_text is None:
             return None, None
         raw_page_text = await handle_consent(raw_page_text, entity.url, client, self.logger)
-        posts, continuation_token, page = self.parse_page(raw_page_text, anchor='var ytInitialData = ')
+        posts, continuation_token, continuation_api_url, page = self.parse_page(raw_page_text, anchor='var ytInitialData = ')
         owner_info = parse_owner_info(page)
         records = self.parse_records(posts, owner_info, entity.url)
         context = CommunityPageContext(
             innertube_context=get_innertube_context(raw_page_text),
             session_index=get_session_index(page),
             continuation_token=continuation_token,
+            continuation_api_url=continuation_api_url,
             owner_info=owner_info,
         )
         return records, context
@@ -220,6 +222,7 @@ class YoutubeCommunityMonitor(PagedFeedMonitor):
             context.continuation_token,
             cookies=client.cookie_jar,
             session_index=context.session_index,
+            api_url=context.continuation_api_url,
         )
         raw_page = await client.request_text(
             url,
@@ -231,16 +234,19 @@ class YoutubeCommunityMonitor(PagedFeedMonitor):
         if raw_page is None:
             return None, None
 
-        posts, continuation_token, _ = self.parse_page(raw_page, anchor='')
+        posts, continuation_token, continuation_api_url, _ = self.parse_page(raw_page, anchor='')
         records = self.parse_records(posts, context.owner_info, entity.url)
         context.continuation_token = continuation_token
+        context.continuation_api_url = continuation_api_url or context.continuation_api_url
         return records, context if continuation_token is not None else None
 
-    def parse_page(self, raw_page: str, anchor: str) -> Tuple[List[dict], Optional[str], dict]:
+    def parse_page(self, raw_page: str, anchor: str) -> Tuple[List[dict], Optional[str], Optional[str], dict]:
         items, page = extract_keys(raw_page, ['backstagePostRenderer', 'continuationEndpoint'], anchor)
         posts = [item for item in items.get('backstagePostRenderer', []) if isinstance(item, dict)]
-        continuation_token = get_continuation_token(items.get('continuationEndpoint', []))
-        return posts, continuation_token, page
+        continuation_endpoints = items.get('continuationEndpoint', [])
+        continuation_token = get_continuation_token(continuation_endpoints)
+        continuation_api_url = get_continuation_api_url(continuation_endpoints)
+        return posts, continuation_token, continuation_api_url, page
 
     def parse_records(self, posts: Sequence[dict], owner_info: Optional[AuthorInfo], source_url: str) -> List[YoutubeCommunityPostRecord]:
         records: List[YoutubeCommunityPostRecord] = []

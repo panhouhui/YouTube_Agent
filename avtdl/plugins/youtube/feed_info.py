@@ -7,7 +7,7 @@ import dateutil.parser
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from avtdl.core.utils import JSONType, find_all, find_one
-from avtdl.plugins.youtube.common import extract_keys, get_continuation_token, thumbnail_url
+from avtdl.plugins.youtube.common import extract_keys, get_continuation_api_url, get_continuation_token, thumbnail_url
 
 
 class VideoRendererInfo(BaseModel):
@@ -29,19 +29,21 @@ class VideoRendererInfo(BaseModel):
     is_member_only: bool
 
 
-def get_video_renderers(page: str, anchor: str = 'var ytInitialData = ') -> Tuple[list, list, Optional[str], dict]:
+def get_video_renderers(page: str, anchor: str = 'var ytInitialData = ') -> Tuple[list, list, Optional[str], Optional[str], dict]:
     keys = [
         'gridVideoRenderer', 'videoRenderer', 'playlistVideoRenderer',
         'lockupViewModel',
         'continuationEndpoint'
     ]
     items, data = extract_keys(page, keys, anchor)
-    continuation_token = get_continuation_token(items.pop('continuationEndpoint', {}))
+    continuation_endpoints = items.pop('continuationEndpoint', {})
+    continuation_token = get_continuation_token(continuation_endpoints)
+    continuation_api_url = get_continuation_api_url(continuation_endpoints)
     lockup_views = items.pop('lockupViewModel', [])
     renderers = []
     for item in items.values():
         renderers.extend(item)
-    return renderers, lockup_views, continuation_token, data
+    return renderers, lockup_views, continuation_token, continuation_api_url, data
 
 
 def parse_scheduled(timestamp: Optional[Any]) -> Optional[datetime.datetime]:

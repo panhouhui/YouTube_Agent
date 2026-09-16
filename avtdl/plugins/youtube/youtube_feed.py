@@ -273,7 +273,7 @@ class VideosMonitor(PagedFeedMonitor):
         if raw_page_text is None:
             return None, None
         raw_page_text = await handle_consent(raw_page_text, entity.url, client, self.logger)
-        video_renderers, lockup_views, continuation_token, page = get_video_renderers(raw_page_text)
+        video_renderers, lockup_views, continuation_token, continuation_api_url, page = get_video_renderers(raw_page_text)
         if not video_renderers and not lockup_views:
             self.logger.warning(f'[{entity.name}] found no videos on first page of {entity.url}')
         owner_info = parse_owner_info(page)
@@ -281,7 +281,13 @@ class VideosMonitor(PagedFeedMonitor):
         current_page_records = self.filter_recent_records(current_page_records, entity)
         innertube_context = get_innertube_context(raw_page_text)
         session_index = get_session_index(page)
-        context = FeedPageContext(innertube_context=innertube_context, session_index=session_index, continuation_token=continuation_token, owner_info=owner_info)
+        context = FeedPageContext(
+            innertube_context=innertube_context,
+            session_index=session_index,
+            continuation_token=continuation_token,
+            continuation_api_url=continuation_api_url,
+            owner_info=owner_info,
+        )
         return current_page_records, context
 
     async def handle_next_page(self, entity: PagedFeedMonitorEntity, client: HttpClient,
@@ -290,13 +296,18 @@ class VideosMonitor(PagedFeedMonitor):
             self.logger.debug(f'[{entity.name}] no continuation for next page, done loading')
             return [], None
 
-        url, headers, post_body = prepare_next_page_request(context.innertube_context, context.continuation_token, cookies=client.cookie_jar)
+        url, headers, post_body = prepare_next_page_request(
+            context.innertube_context,
+            context.continuation_token,
+            cookies=client.cookie_jar,
+            api_url=context.continuation_api_url,
+        )
         raw_page = await client.request_text(url, method='POST', data_json=post_body, headers=headers,
                                         settings=RetrySettings(retry_times=3, retry_delay=5, retry_multiplier=2))
         if raw_page is None:
             self.logger.debug(f'[{entity.name}] failed to load next page, aborting')
             return None, None
-        video_renderers, lockup_views, continuation_token, page = get_video_renderers(raw_page, anchor='')
+        video_renderers, lockup_views, continuation_token, continuation_api_url, page = get_video_renderers(raw_page, anchor='')
 
         if not video_renderers and not lockup_views:
             self.logger.debug(f'[{entity.name}] found no videos when parsing continuation of {entity.url}')
@@ -305,6 +316,7 @@ class VideosMonitor(PagedFeedMonitor):
 
         if continuation_token is not None:
             context.continuation_token = continuation_token
+            context.continuation_api_url = continuation_api_url or context.continuation_api_url
         else:
             context = None
         return current_page_records, context

@@ -1,0 +1,5 @@
+# One YouTube key account per line.
+# Accepted forms:
+# @example
+# Example Channel
+# https://www.youtube.com/@example

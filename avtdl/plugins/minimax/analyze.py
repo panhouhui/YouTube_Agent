@@ -123,7 +123,9 @@ def matched_keywords(record: Record, patterns: Sequence[str]) -> list[str]:
 @Plugins.register('minimax.analyze', Plugins.kind.ASSOCIATED_RECORD)
 class MiniMaxAnalysisRecord(Record):
     title: Optional[str] = None
+    summary: Optional[str] = None
     author: Optional[str] = None
+    channel_link: Optional[str] = None
     url: str
     source_url: Optional[str] = None
     video_id: Optional[str] = None
@@ -256,9 +258,12 @@ class MiniMaxAnalyzeAction(QueueAction):
             return self.apec_risk_record(entity, record, keywords, response, reason, confidence)
 
         original = record.model_dump()
+        observed_at = datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M:%S UTC+08:00')
         return MiniMaxAnalysisRecord(
             title=original.get('title'),
+            summary=original.get('summary'),
             author=original.get('author'),
+            channel_link=original.get('channel_link'),
             url=original.get('url'),
             source_url=original.get('source_url'),
             video_id=original.get('video_id'),
@@ -268,6 +273,9 @@ class MiniMaxAnalyzeAction(QueueAction):
             matched_keywords='、'.join(keywords) if keywords else '未明确返回',
             push_reason=reason,
             ai_confidence=confidence,
+            source_name=entity.source_name or 'YouTube',
+            source_platform='YouTube',
+            observed_at=observed_at,
         )
 
     def apec_risk_record(self, entity: MiniMaxAnalyzeEntity, record: Record, keywords: Sequence[str],
@@ -289,7 +297,9 @@ class MiniMaxAnalyzeAction(QueueAction):
 
         return MiniMaxAnalysisRecord(
             title=original.get('title'),
+            summary=original.get('summary'),
             author=original.get('author'),
+            channel_link=original.get('channel_link'),
             url=original.get('url'),
             source_url=entity.source_url or original.get('source_url'),
             video_id=original.get('video_id'),
@@ -351,7 +361,9 @@ class MiniMaxAnalyzeAction(QueueAction):
         source_name = entity.source_name or original.get('author') or '重点账号动态'
         return MiniMaxAnalysisRecord(
             title=original.get('title'),
+            summary=original.get('summary'),
             author=original.get('author'),
+            channel_link=original.get('channel_link'),
             url=original.get('url'),
             source_url=entity.source_url or original.get('source_url'),
             video_id=original.get('video_id'),

@@ -83,47 +83,121 @@ actors:
         source_url: "https://www.youtube.com/@jintsumi/posts"
         min_confidence: 0
 
+  youtube.keyword_agents:
+    entities:
+      - name: "yt collector agent record"
+        agent_role: "collector"
+      - name: "yt key accounts agent record"
+        agent_role: "key_accounts"
+        key_accounts_file: "key_accounts.youtube.txt"
+      - name: "yt hotspots agent record"
+        agent_role: "hotspots"
+      - name: "yt analyst agent record"
+        agent_role: "analyst"
+
   mattermost:
     config:
       base_url: "https://kan.cool"
       env_file: ".env"
     entities:
       - name: "kan keyword groups"
+        consume_record: false
+        channels: &youtube_keyword_channels
+          - "riro3ne5kbyqjgcwooedszrhyc"
+          - "ta9wr1uag7n6mjax6hyaf8dndc"
+          - "ky5cpcp7z3dhbb7kasg5ou63fa"
+          - "yp6o8eykbpgw3f5m1j3895dfhh"
+          - "49e5k748p3gx9neqfxyq7ij15c"
+        message_template: "命中关键词：{matched_keywords}\n\n推送原因：{push_reason}\n\n原YouTube链接：{url}"
+      - name: "yt collector agent group"
         token_env: "YOUTUBE_AGENT_COLLECTOR_TOKEN"
-        channels:
-          - "riro3ne5kbyqjgcwooedszrhyc"
-          - "ta9wr1uag7n6mjax6hyaf8dndc"
-          - "ky5cpcp7z3dhbb7kasg5ou63fa"
-          - "yp6o8eykbpgw3f5m1j3895dfhh"
-          - "49e5k748p3gx9neqfxyq7ij15c"
-        message_template: &youtube_keyword_template "命中关键词：{matched_keywords}\n\n推送原因：{push_reason}\n\n原YouTube链接：{url}"
-      - name: "youtube key accounts agent"
+        channels: *youtube_keyword_channels
+        required_fields:
+          agent_role: "collector"
+        message_template: |
+          【YT 舆情线索快报】
+
+          结论：本轮采集到 {raw_collected_rows} 条公开记录，整理出 {valid_lead_count} 条可复核线索，{collector_conclusion}
+
+          监测时间：{run_time}
+          监测范围：{scope}
+          主要命中词：{top_keywords}
+          涉及账号：{related_accounts}
+          进入后续研判：{candidate_count} 条
+
+          优先查看链接：
+          {candidate_link_summaries}
+
+          采集说明：{collector_note}
+          下一步：继续判断是否形成重复传播或议题聚集。
+      - name: "yt key accounts agent group"
         token_env: "YOUTUBE_AGENT_KEY_ACCOUNTS_TOKEN"
-        channels:
-          - "riro3ne5kbyqjgcwooedszrhyc"
-          - "ta9wr1uag7n6mjax6hyaf8dndc"
-          - "ky5cpcp7z3dhbb7kasg5ou63fa"
-          - "yp6o8eykbpgw3f5m1j3895dfhh"
-          - "49e5k748p3gx9neqfxyq7ij15c"
-        message_template: *youtube_keyword_template
-      - name: "youtube hotspots agent"
+        channels: *youtube_keyword_channels
+        required_fields:
+          agent_role: "key_accounts"
+        message_template: |
+          【YT 重点账号监测提醒】
+
+          结论：本轮监测 {account_count} 个重点账号，新增动态 {new_post_count} 条，读取失败 {failed_count} 个，{key_account_conclusion}
+
+          监测时间：{run_time}
+          成功读取：{success_count} 个
+          账号状态记录：{state_file_count} 个
+          已过滤重复内容：{duplicate_filtered_count} 条
+          需补采账号：{failed_accounts}
+          重点账号：{active_accounts}
+
+          新增链接与内容简介：
+          {key_event_link_summaries}
+
+          处置建议：{key_account_action}
+      - name: "yt hotspots agent group"
         token_env: "YOUTUBE_AGENT_HOTSPOTS_TOKEN"
-        channels:
-          - "riro3ne5kbyqjgcwooedszrhyc"
-          - "ta9wr1uag7n6mjax6hyaf8dndc"
-          - "ky5cpcp7z3dhbb7kasg5ou63fa"
-          - "yp6o8eykbpgw3f5m1j3895dfhh"
-          - "49e5k748p3gx9neqfxyq7ij15c"
-        message_template: *youtube_keyword_template
-      - name: "youtube analyst agent"
+        channels: *youtube_keyword_channels
+        required_fields:
+          agent_role: "hotspots"
+        message_template: |
+          【YT 可关注议题提醒】
+
+          结论：本轮形成 {candidate_count} 个可关注议题，风险等级 {risk_level}，{hotspot_conclusion}
+
+          监测时间：{run_time}
+          主要议题：{main_topics}
+          需继续复核：{needs_analysis_count} 个
+          关注原因：{hotspot_reason}
+
+          代表链接与内容简介：
+          {candidate_link_summaries}
+
+          证据摘要：
+          {evidence_summary}
+          建议动作：{hotspot_action}
+      - name: "yt analyst agent group"
         token_env: "YOUTUBE_AGENT_ANALYST_TOKEN"
-        channels:
-          - "riro3ne5kbyqjgcwooedszrhyc"
-          - "ta9wr1uag7n6mjax6hyaf8dndc"
-          - "ky5cpcp7z3dhbb7kasg5ou63fa"
-          - "yp6o8eykbpgw3f5m1j3895dfhh"
-          - "49e5k748p3gx9neqfxyq7ij15c"
-        message_template: *youtube_keyword_template
+        channels: *youtube_keyword_channels
+        required_fields:
+          agent_role: "analyst"
+        message_template: |
+          【YT 舆情研判简报】
+
+          结论：{executive_summary}
+
+          报告时间：{run_time}
+          风险等级：{risk_level}
+
+          重点发现：
+          {key_findings}
+
+          优先复核链接：
+          {candidate_link_summaries}
+
+          影响判断：
+          {impact_assessment}
+
+          建议动作：
+          {analyst_action}
+
+          备注：本简报基于 YouTube 公开数据整理，重要处置请结合人工复核。
       - name: "jintsumi key person group"
         channel_env: "JINTSUMI_MATTERMOST_CHANNEL_ID"
         token_env: "JINTSUMI_MATTERMOST_BOT_TOKEN"
@@ -189,9 +263,16 @@ chains:
         - "anti-china review"
     - mattermost:
         - "kan keyword groups"
-        - "youtube key accounts agent"
-        - "youtube hotspots agent"
-        - "youtube analyst agent"
+    - youtube.keyword_agents:
+        - "yt collector agent record"
+        - "yt key accounts agent record"
+        - "yt hotspots agent record"
+        - "yt analyst agent record"
+    - mattermost:
+        - "yt collector agent group"
+        - "yt key accounts agent group"
+        - "yt hotspots agent group"
+        - "yt analyst agent group"
   "jintsumi community monitor":
     - youtube.community:
         - "jintsumi community posts"

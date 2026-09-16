@@ -66,6 +66,8 @@ class MattermostEntity(QueueActionEntity):
     """optional env vars containing Mattermost channel ids"""
     token_env: Optional[str] = None
     """optional env var containing a bot token for this entity"""
+    required_fields: Dict[str, str] = Field(default_factory=dict)
+    """optional record field values required before this entity sends a message"""
     message_template: Optional[str] = None
     """optional template used to format the message. If omitted, record text representation is used"""
 
@@ -169,8 +171,21 @@ class MattermostAction(QueueAction):
             return str(record)
         return Fmt.format(entity.message_template, record, tz=entity.timezone)
 
+    def record_matches(self, entity: MattermostEntity, record: Record) -> bool:
+        if not entity.required_fields:
+            return True
+        data = record.model_dump()
+        for field, expected in entity.required_fields.items():
+            value = data.get(field)
+            if str(value) != str(expected):
+                return False
+        return True
+
     async def handle_single_record(self, logger: logging.Logger, client: HttpClient,
                                    entity: MattermostEntity, record: Record) -> None:
+        if not self.record_matches(entity, record):
+            logger.debug(f'[{entity.name}] record does not match required fields, skipping')
+            return
         token = self.token_for(entity)
         if token is None:
             logger.warning(f'[{entity.name}] Mattermost bot token is not configured, skipping record')

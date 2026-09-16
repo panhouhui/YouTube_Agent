@@ -101,6 +101,31 @@ actors:
       - name: "yt analyst agent record"
         agent_role: "analyst"
 
+  kan.status_report:
+    config:
+      base_url: "https://kan.cool"
+      endpoint_path: "/api/external/agent-status/report"
+      env_file: ".env"
+      report_key_env: "YOUTUBE_STATUS_REPORT_KEY"
+      secret_env: "KAN_AGENT_STATUS_REPORT_SECRET"
+      db_path: "runtime/youtube/db"
+      state_file: "runtime/youtube/state/kan_status_report.json"
+      log_files:
+        - "log/avtdl.log"
+      report_interval: 600
+      stale_after_seconds: 900
+      report_window_seconds: 86400
+    entities:
+      - name: "youtube hk status"
+        feed_names:
+          - "youtube keyword search"
+          - "youtube APEC search"
+          - "jintsumi community posts"
+        normal_feed_names:
+          - "youtube keyword search"
+        apec_feed_names:
+          - "youtube APEC search"
+
   mattermost:
     config:
       base_url: "https://kan.cool"

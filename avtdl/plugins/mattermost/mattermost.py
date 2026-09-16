@@ -60,6 +60,8 @@ class MattermostConfig(QueueActionConfig):
 class MattermostEntity(QueueActionEntity):
     channels: List[str] = Field(default_factory=list)
     """Mattermost channel ids to post into"""
+    channel_routes: Dict[str, Dict[str, List[str]]] = Field(default_factory=dict)
+    """optional field based channel routes, for example keyword_group: {hk: [channel_id]}"""
     channel_env: Optional[str] = None
     """optional env var containing one Mattermost channel id"""
     channel_envs: List[str] = Field(default_factory=list)
@@ -129,13 +131,15 @@ class MattermostAction(QueueAction):
             self.logger.warning(f'failed to store Mattermost sent history to "{path}": {e}')
 
     def sent_key(self, record: Record) -> str:
+        keyword_group = getattr(record, 'keyword_group', None)
+        group_prefix = f'group:{keyword_group}:' if keyword_group else ''
         video_id = getattr(record, 'video_id', None)
         if video_id:
-            return f'video:{video_id}'
+            return f'{group_prefix}video:{video_id}'
         url = getattr(record, 'url', None)
         if url:
-            return f'url:{url}'
-        return f'hash:{record.hash()}'
+            return f'{group_prefix}url:{url}'
+        return f'{group_prefix}hash:{record.hash()}'
 
     def endpoint_url(self) -> str:
         base = str(self.conf.base_url).rstrip('/')
@@ -151,7 +155,14 @@ class MattermostAction(QueueAction):
                 self.tokens[token_env] = token
         return self.tokens.get(token_env)
 
-    def channels_for(self, entity: MattermostEntity) -> List[str]:
+    def channels_for(self, entity: MattermostEntity, record: Optional[Record] = None) -> List[str]:
+        if entity.channel_routes and record is not None:
+            data = record.model_dump()
+            for field, routes in entity.channel_routes.items():
+                value = data.get(field)
+                routed = routes.get(str(value))
+                if routed is not None:
+                    return list(routed)
         channels = list(entity.channels)
         env_names = list(entity.channel_envs)
         if entity.channel_env:
@@ -190,7 +201,7 @@ class MattermostAction(QueueAction):
         if token is None:
             logger.warning(f'[{entity.name}] Mattermost bot token is not configured, skipping record')
             return
-        channels = self.channels_for(entity)
+        channels = self.channels_for(entity, record)
         if not channels:
             logger.warning(f'[{entity.name}] Mattermost channels are not configured, skipping record')
             return

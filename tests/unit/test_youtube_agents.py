@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from avtdl.core.config import SettingsSection
 from avtdl.core.interfaces import OpaqueRecord
 from avtdl.core.runtime import MessageBus, RuntimeContext, TasksController
+from avtdl.plugins.mattermost.mattermost import MattermostAction, MattermostConfig, MattermostEntity
 from avtdl.plugins.youtube.agents import (
     YouTubeKeywordAgentEntity,
     YouTubeKeywordAgentsAction,
@@ -86,3 +87,53 @@ def test_key_account_matching_uses_account_file(tmp_path):
     )
 
     assert action.is_key_account(action.entities['key'], make_record())
+
+
+def test_agent_record_preserves_keyword_group(tmp_path):
+    action = YouTubeKeywordAgentsAction(
+        YouTubeKeywordAgentsConfig(name='youtube.keyword_agents', db_path=tmp_path / 'missing.sqlite'),
+        [YouTubeKeywordAgentEntity(name='collector', agent_role='collector')],
+        make_context(tmp_path),
+    )
+    record = OpaqueRecord(
+        title='Hong Kong test',
+        author='Channel A',
+        url='https://www.youtube.com/watch?v=hk',
+        video_id='hk',
+        matched_keywords='港独',
+        keyword_group='hk',
+        push_reason='matched HK keyword',
+        ai_confidence=0.8,
+    )
+
+    output = action.build_agent_record(action.entities['collector'], record)
+
+    assert output.keyword_group == 'hk'
+
+
+def test_mattermost_routes_channels_by_keyword_group(tmp_path):
+    action = MattermostAction(
+        MattermostConfig(name='mattermost'),
+        [
+            MattermostEntity(
+                name='keyword groups',
+                channels=['general-a', 'general-b'],
+                channel_routes={
+                    'keyword_group': {
+                        'hk': ['a1'],
+                        'tw': ['a2'],
+                        'general': ['general-a', 'general-b'],
+                    }
+                },
+            )
+        ],
+        make_context(tmp_path),
+    )
+    entity = action.entities['keyword groups']
+
+    assert action.channels_for(entity, OpaqueRecord(keyword_group='hk', url='https://example.com/hk')) == ['a1']
+    assert action.channels_for(entity, OpaqueRecord(keyword_group='tw', url='https://example.com/tw')) == ['a2']
+    assert action.channels_for(entity, OpaqueRecord(keyword_group='general', url='https://example.com/general')) == [
+        'general-a',
+        'general-b',
+    ]

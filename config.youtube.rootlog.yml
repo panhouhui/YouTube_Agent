@@ -10,7 +10,29 @@ actors:
     entities:
       - name: "youtube keyword search"
         url: "https://www.youtube.com/results?search_query=YouTube"
-        keywords_file: "keywords.txt"
+        keywords_file: "keywords.general.txt"
+        keywords_per_update: 5
+        env_file: ".env"
+        cookie_env: "YouTube_cookie"
+        max_age_hours: 24
+        update_interval: 900
+        quiet_first_time: true
+        max_continuation_depth: 5
+
+      - name: "youtube HK keyword search"
+        url: "https://www.youtube.com/results?search_query=Hong+Kong"
+        keywords_file: "keywords.hk.txt"
+        keywords_per_update: 5
+        env_file: ".env"
+        cookie_env: "YouTube_cookie"
+        max_age_hours: 24
+        update_interval: 900
+        quiet_first_time: true
+        max_continuation_depth: 5
+
+      - name: "youtube TW keyword search"
+        url: "https://www.youtube.com/results?search_query=Taiwan"
+        keywords_file: "keywords.tw.txt"
         keywords_per_update: 5
         env_file: ".env"
         cookie_env: "YouTube_cookie"
@@ -44,7 +66,21 @@ actors:
   filter.match:
     entities:
       - name: "youtube keywords"
-        patterns_file: "keywords.txt"
+        patterns_file: "keywords.general.txt"
+        fields:
+          - "title"
+          - "summary"
+          - "author"
+
+      - name: "youtube HK keywords"
+        patterns_file: "keywords.hk.txt"
+        fields:
+          - "title"
+          - "summary"
+          - "author"
+
+      - name: "youtube TW keywords"
+        patterns_file: "keywords.tw.txt"
         fields:
           - "title"
           - "summary"
@@ -61,6 +97,12 @@ actors:
       - name: "youtube video deduplicate"
         field: "video_id"
 
+      - name: "youtube HK video deduplicate"
+        field: "video_id"
+
+      - name: "youtube TW video deduplicate"
+        field: "video_id"
+
       - name: apec video deduplicate
         field: video_id
   minimax.analyze:
@@ -69,10 +111,20 @@ actors:
       consumption_delay: 1
     entities:
       - name: "anti-china review"
-        keywords_file: "keywords.txt"
+        keywords_file: "keywords.general.txt"
+        keyword_group: "general"
+        min_confidence: 0.65
+      - name: "hk anti-china review"
+        keywords_file: "keywords.hk.txt"
+        keyword_group: "hk"
+        min_confidence: 0.65
+      - name: "tw anti-china review"
+        keywords_file: "keywords.tw.txt"
+        keyword_group: "tw"
         min_confidence: 0.65
       - name: "apec anti-china review"
         keywords_file: "keywords.apec.txt"
+        keyword_group: "apec"
         min_confidence: 0.65
         analysis_mode: "apec_risk"
         source_name: "YouTube"
@@ -119,10 +171,14 @@ actors:
       - name: "youtube hk status"
         feed_names:
           - "youtube keyword search"
+          - "youtube HK keyword search"
+          - "youtube TW keyword search"
           - "youtube APEC search"
           - "jintsumi community posts"
         normal_feed_names:
           - "youtube keyword search"
+          - "youtube HK keyword search"
+          - "youtube TW keyword search"
         apec_feed_names:
           - "youtube APEC search"
 
@@ -139,10 +195,22 @@ actors:
           - "ky5cpcp7z3dhbb7kasg5ou63fa"
           - "yp6o8eykbpgw3f5m1j3895dfhh"
           - "49e5k748p3gx9neqfxyq7ij15c"
-        message_template: "命中关键词：{matched_keywords}\n\n推送原因：{push_reason}\n\n原YouTube链接：{url}"
+        channel_routes:
+          keyword_group:
+            general: *youtube_keyword_channels
+            hk: &youtube_hk_channels
+              - "ta9wr1uag7n6mjax6hyaf8dndc"
+            tw: &youtube_tw_channels
+              - "ky5cpcp7z3dhbb7kasg5ou63fa"
+        message_template: "关键词分组：{keyword_group}\n命中关键词：{matched_keywords}\n\n推送原因：{push_reason}\n\n原YouTube链接：{url}"
       - name: "yt collector agent group"
         token_env: "YOUTUBE_AGENT_COLLECTOR_TOKEN"
         channels: *youtube_keyword_channels
+        channel_routes:
+          keyword_group:
+            general: *youtube_keyword_channels
+            hk: *youtube_hk_channels
+            tw: *youtube_tw_channels
         required_fields:
           agent_role: "collector"
         message_template: |
@@ -152,6 +220,7 @@ actors:
 
           监测时间：{run_time}
           监测范围：{scope}
+          关键词分组：{keyword_group}
           主要命中词：{top_keywords}
           涉及账号：{related_accounts}
           进入后续研判：{candidate_count} 条
@@ -164,6 +233,11 @@ actors:
       - name: "yt key accounts agent group"
         token_env: "YOUTUBE_AGENT_KEY_ACCOUNTS_TOKEN"
         channels: *youtube_keyword_channels
+        channel_routes:
+          keyword_group:
+            general: *youtube_keyword_channels
+            hk: *youtube_hk_channels
+            tw: *youtube_tw_channels
         required_fields:
           agent_role: "key_accounts"
         message_template: |
@@ -172,6 +246,7 @@ actors:
           结论：本轮监测 {account_count} 个重点账号，新增动态 {new_post_count} 条，读取失败 {failed_count} 个，{key_account_conclusion}
 
           监测时间：{run_time}
+          关键词分组：{keyword_group}
           成功读取：{success_count} 个
           账号状态记录：{state_file_count} 个
           已过滤重复内容：{duplicate_filtered_count} 条
@@ -185,6 +260,11 @@ actors:
       - name: "yt hotspots agent group"
         token_env: "YOUTUBE_AGENT_HOTSPOTS_TOKEN"
         channels: *youtube_keyword_channels
+        channel_routes:
+          keyword_group:
+            general: *youtube_keyword_channels
+            hk: *youtube_hk_channels
+            tw: *youtube_tw_channels
         required_fields:
           agent_role: "hotspots"
         message_template: |
@@ -193,6 +273,7 @@ actors:
           结论：当前形成 {candidate_count} 个可关注议题，风险等级 {risk_level}，{hotspot_conclusion}
 
           监测时间：{run_time}
+          关键词分组：{keyword_group}
           主要议题：{main_topics}
           需继续复核：{needs_analysis_count} 个
           关注原因：{hotspot_reason}
@@ -206,6 +287,11 @@ actors:
       - name: "yt analyst agent group"
         token_env: "YOUTUBE_AGENT_ANALYST_TOKEN"
         channels: *youtube_keyword_channels
+        channel_routes:
+          keyword_group:
+            general: *youtube_keyword_channels
+            hk: *youtube_hk_channels
+            tw: *youtube_tw_channels
         required_fields:
           agent_role: "analyst"
         message_template: |
@@ -215,6 +301,7 @@ actors:
 
           报告时间：{run_time}
           风险等级：{risk_level}
+          关键词分组：{keyword_group}
 
           重点发现：
           {key_findings}
@@ -283,7 +370,7 @@ actors:
           检索来源：
           {source_url}
 chains:
-  "youtube keyword monitor":
+  "youtube general keyword monitor":
     - channel:
         - "youtube keyword search"
     - filter.match:
@@ -292,6 +379,48 @@ chains:
         - "youtube video deduplicate"
     - minimax.analyze:
         - "anti-china review"
+    - mattermost:
+        - "kan keyword groups"
+    - youtube.keyword_agents:
+        - "yt collector agent record"
+        - "yt key accounts agent record"
+        - "yt hotspots agent record"
+        - "yt analyst agent record"
+    - mattermost:
+        - "yt collector agent group"
+        - "yt key accounts agent group"
+        - "yt hotspots agent group"
+        - "yt analyst agent group"
+  "youtube hk keyword monitor":
+    - channel:
+        - "youtube HK keyword search"
+    - filter.match:
+        - "youtube HK keywords"
+    - filter.deduplicate:
+        - "youtube HK video deduplicate"
+    - minimax.analyze:
+        - "hk anti-china review"
+    - mattermost:
+        - "kan keyword groups"
+    - youtube.keyword_agents:
+        - "yt collector agent record"
+        - "yt key accounts agent record"
+        - "yt hotspots agent record"
+        - "yt analyst agent record"
+    - mattermost:
+        - "yt collector agent group"
+        - "yt key accounts agent group"
+        - "yt hotspots agent group"
+        - "yt analyst agent group"
+  "youtube tw keyword monitor":
+    - channel:
+        - "youtube TW keyword search"
+    - filter.match:
+        - "youtube TW keywords"
+    - filter.deduplicate:
+        - "youtube TW video deduplicate"
+    - minimax.analyze:
+        - "tw anti-china review"
     - mattermost:
         - "kan keyword groups"
     - youtube.keyword_agents:

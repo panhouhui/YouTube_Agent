@@ -133,6 +133,7 @@ class MiniMaxAnalysisRecord(Record):
     published_text: Optional[str] = None
     content: Optional[str] = None
     matched_keywords: str
+    keyword_group: str = 'general'
     push_reason: str
     ai_confidence: float
     ai_summary: Optional[str] = None
@@ -183,6 +184,8 @@ class MiniMaxAnalyzeConfig(QueueActionConfig):
 class MiniMaxAnalyzeEntity(QueueActionEntity):
     keywords_file: Path = Path('keywords.txt')
     """keyword file used to report matched keywords to the model and final notification"""
+    keyword_group: str = 'general'
+    """routing group copied into analysis records, e.g. general, hk, tw, apec"""
     min_confidence: float = Field(default=0.65, ge=0, le=1)
     """minimum model confidence required to push"""
     analysis_mode: str = 'risk'
@@ -271,6 +274,7 @@ class MiniMaxAnalyzeAction(QueueAction):
             published_text=original.get('published_text'),
             content=original.get('content'),
             matched_keywords='、'.join(keywords) if keywords else '未明确返回',
+            keyword_group=entity.keyword_group,
             push_reason=reason,
             ai_confidence=confidence,
             source_name=entity.source_name or 'YouTube',
@@ -307,6 +311,7 @@ class MiniMaxAnalyzeAction(QueueAction):
             published_text=original.get('published_text'),
             content=original.get('content'),
             matched_keywords='、'.join(keywords) if keywords else 'APEC',
+            keyword_group=entity.keyword_group,
             push_reason=reason,
             ai_confidence=confidence,
             source_name=source_platform,
@@ -371,6 +376,7 @@ class MiniMaxAnalyzeAction(QueueAction):
             published_text=original.get('published_text'),
             content=original.get('content'),
             matched_keywords=source_name,
+            keyword_group=entity.keyword_group,
             push_reason=reason or summary,
             ai_confidence=confidence,
             ai_summary=summary or reason,

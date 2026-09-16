@@ -84,6 +84,12 @@ actors:
         min_confidence: 0
 
   youtube.keyword_agents:
+    config:
+      db_path: "runtime/youtube/db"
+      feed_name: "youtube keyword search"
+      stats_window_hours: 24
+      baseline_window_hours: 168
+      top_accounts_limit: 5
     entities:
       - name: "yt collector agent record"
         agent_role: "collector"
@@ -117,7 +123,7 @@ actors:
         message_template: |
           【YT 舆情线索快报】
 
-          结论：本轮采集到 {raw_collected_rows} 条公开记录，整理出 {valid_lead_count} 条可复核线索，{collector_conclusion}
+          结论：近 {stats_window_hours} 小时采集到 {raw_collected_rows} 条公开记录，当前整理出 {valid_lead_count} 条可复核线索，{collector_conclusion}
 
           监测时间：{run_time}
           监测范围：{scope}
@@ -159,7 +165,7 @@ actors:
         message_template: |
           【YT 可关注议题提醒】
 
-          结论：本轮形成 {candidate_count} 个可关注议题，风险等级 {risk_level}，{hotspot_conclusion}
+          结论：当前形成 {candidate_count} 个可关注议题，风险等级 {risk_level}，{hotspot_conclusion}
 
           监测时间：{run_time}
           主要议题：{main_topics}

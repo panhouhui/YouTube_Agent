@@ -199,6 +199,7 @@ actors:
           keyword_group:
             general: *youtube_keyword_channels
             hk: &youtube_hk_channels
+              - "riro3ne5kbyqjgcwooedszrhyc"
               - "ta9wr1uag7n6mjax6hyaf8dndc"
             tw: &youtube_tw_channels
               - "ky5cpcp7z3dhbb7kasg5ou63fa"

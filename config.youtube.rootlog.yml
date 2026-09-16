@@ -17,7 +17,7 @@ actors:
         max_age_hours: 24
         update_interval: 900
         quiet_first_time: true
-        max_continuation_depth: 1
+        max_continuation_depth: 5
 
       - name: youtube APEC search
         url: https://www.youtube.com/results?search_query=APEC
@@ -28,7 +28,7 @@ actors:
         max_age_hours: 24
         update_interval: 900
         quiet_first_time: true
-        max_continuation_depth: 1
+        max_continuation_depth: 5
   youtube.community:
     config:
       db_path: "runtime/youtube/db"

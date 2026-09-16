@@ -380,8 +380,6 @@ chains:
         - "youtube video deduplicate"
     - minimax.analyze:
         - "anti-china review"
-    - mattermost:
-        - "kan keyword groups"
     - youtube.keyword_agents:
         - "yt collector agent record"
         - "yt key accounts agent record"
@@ -401,8 +399,6 @@ chains:
         - "youtube HK video deduplicate"
     - minimax.analyze:
         - "hk anti-china review"
-    - mattermost:
-        - "kan keyword groups"
     - youtube.keyword_agents:
         - "yt collector agent record"
         - "yt key accounts agent record"
@@ -422,8 +418,6 @@ chains:
         - "youtube TW video deduplicate"
     - minimax.analyze:
         - "tw anti-china review"
-    - mattermost:
-        - "kan keyword groups"
     - youtube.keyword_agents:
         - "yt collector agent record"
         - "yt key accounts agent record"

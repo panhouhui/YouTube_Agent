@@ -187,8 +187,8 @@ actors:
       base_url: "https://kan.cool"
       env_file: ".env"
     entities:
-      - name: "kan keyword groups"
-        consume_record: false
+      - name: "yt collector agent group"
+        token_env: "YOUTUBE_AGENT_COLLECTOR_TOKEN"
         channels: &youtube_keyword_channels
           - "riro3ne5kbyqjgcwooedszrhyc"
           - "ta9wr1uag7n6mjax6hyaf8dndc"
@@ -196,7 +196,7 @@ actors:
           - "yp6o8eykbpgw3f5m1j3895dfhh"
           - "49e5k748p3gx9neqfxyq7ij15c"
         channel_routes:
-          keyword_group:
+          ai_route_group:
             general: *youtube_keyword_channels
             hk: &youtube_hk_channels
               - "riro3ne5kbyqjgcwooedszrhyc"
@@ -205,16 +205,6 @@ actors:
               - "ky5cpcp7z3dhbb7kasg5ou63fa"
             svip: &youtube_svip_channels
               - "riro3ne5kbyqjgcwooedszrhyc"
-        message_template: "关键词分组：{keyword_group}\n命中关键词：{matched_keywords}\n\n推送原因：{push_reason}\n\n原YouTube链接：{url}"
-      - name: "yt collector agent group"
-        token_env: "YOUTUBE_AGENT_COLLECTOR_TOKEN"
-        channels: *youtube_keyword_channels
-        channel_routes:
-          ai_route_group:
-            general: *youtube_keyword_channels
-            hk: *youtube_hk_channels
-            tw: *youtube_tw_channels
-            svip: *youtube_svip_channels
           keyword_group:
             general: *youtube_keyword_channels
             hk: *youtube_hk_channels

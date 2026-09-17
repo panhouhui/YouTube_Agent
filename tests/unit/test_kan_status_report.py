@@ -39,13 +39,14 @@ def test_status_payload_uses_db_and_log_counters(tmp_path):
     log_path = tmp_path / 'avtdl.log'
     state_file = tmp_path / 'state.json'
     make_db(db_path)
+    now = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
     log_path.write_text(
         '\n'.join(
             [
-                '2026/09/16 10:00:00.000 [DEBUG] [actor.mattermost] [kan keyword groups] sent record to Mattermost channel "normal"',
-                '2026/09/16 10:00:01.000 [DEBUG] [actor.mattermost] [apec keyword group] sent record to Mattermost channel "apec"',
-                '2026/09/16 10:00:02.000 [WARNING] [actor.mattermost] [apec keyword group] failed to send record to Mattermost channel "apec"',
-                '2026/09/16 10:00:03.000 [ERROR] [actor.minimax.analyze] minimax request failed',
+                f'{now}.000 [DEBUG] [actor.mattermost] [kan keyword groups] sent record to Mattermost channel "normal"',
+                f'{now}.001 [DEBUG] [actor.mattermost] [apec keyword group] sent record to Mattermost channel "apec"',
+                f'{now}.002 [WARNING] [actor.mattermost] [apec keyword group] failed to send record to Mattermost channel "apec"',
+                f'{now}.003 [ERROR] [actor.minimax.analyze] minimax request failed',
             ]
         ),
         encoding='utf-8',

@@ -132,7 +132,13 @@ class MattermostAction(QueueAction):
 
     def sent_key(self, record: Record) -> str:
         keyword_group = getattr(record, 'keyword_group', None)
-        group_prefix = f'group:{keyword_group}:' if keyword_group else ''
+        ai_route_group = getattr(record, 'ai_route_group', None)
+        group_parts = []
+        if keyword_group:
+            group_parts.append(f'group:{keyword_group}')
+        if ai_route_group:
+            group_parts.append(f'route:{ai_route_group}')
+        group_prefix = ':'.join(group_parts) + ':' if group_parts else ''
         video_id = getattr(record, 'video_id', None)
         if video_id:
             return f'{group_prefix}video:{video_id}'

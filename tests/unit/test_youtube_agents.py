@@ -111,6 +111,30 @@ def test_agent_record_preserves_keyword_group(tmp_path):
     assert output.keyword_group == 'hk'
 
 
+def test_agent_record_preserves_ai_route_group(tmp_path):
+    action = YouTubeKeywordAgentsAction(
+        YouTubeKeywordAgentsConfig(name='youtube.keyword_agents', db_path=tmp_path / 'missing.sqlite'),
+        [YouTubeKeywordAgentEntity(name='collector', agent_role='collector')],
+        make_context(tmp_path),
+    )
+    record = OpaqueRecord(
+        title='SVIP routed test',
+        author='Channel A',
+        url='https://www.youtube.com/watch?v=svip',
+        video_id='svip',
+        matched_keywords='反华',
+        keyword_group='general',
+        ai_route_group='svip',
+        push_reason='AI recommends SVIP routing',
+        ai_confidence=0.8,
+    )
+
+    output = action.build_agent_record(action.entities['collector'], record)
+
+    assert output.keyword_group == 'general'
+    assert output.ai_route_group == 'svip'
+
+
 def test_mattermost_routes_channels_by_keyword_group(tmp_path):
     action = MattermostAction(
         MattermostConfig(name='mattermost'),
@@ -137,3 +161,38 @@ def test_mattermost_routes_channels_by_keyword_group(tmp_path):
         'general-a',
         'general-b',
     ]
+
+
+def test_mattermost_prefers_ai_route_group_with_keyword_group_fallback(tmp_path):
+    action = MattermostAction(
+        MattermostConfig(name='mattermost'),
+        [
+            MattermostEntity(
+                name='keyword groups',
+                channels=['general-a', 'general-b'],
+                channel_routes={
+                    'ai_route_group': {
+                        'svip': ['svip'],
+                        'hk': ['a1'],
+                        'tw': ['a2'],
+                    },
+                    'keyword_group': {
+                        'hk': ['a1'],
+                        'tw': ['a2'],
+                        'general': ['general-a', 'general-b'],
+                    },
+                },
+            )
+        ],
+        make_context(tmp_path),
+    )
+    entity = action.entities['keyword groups']
+
+    assert action.channels_for(
+        entity,
+        OpaqueRecord(keyword_group='general', ai_route_group='svip', url='https://example.com/svip'),
+    ) == ['svip']
+    assert action.channels_for(
+        entity,
+        OpaqueRecord(keyword_group='tw', ai_route_group='unknown', url='https://example.com/fallback'),
+    ) == ['a2']

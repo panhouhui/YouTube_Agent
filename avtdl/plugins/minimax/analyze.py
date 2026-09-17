@@ -40,6 +40,20 @@ FORBIDDEN_ANALYSIS_TERMS = (
     '豆包',
 )
 
+AI_ROUTE_GROUP_ALIASES = {
+    'svip': 'svip',
+    'test': 'svip',
+    'hk': 'hk',
+    'hong kong': 'hk',
+    'a1': 'hk',
+    'tw': 'tw',
+    'taiwan': 'tw',
+    'a2': 'tw',
+    'general': 'general',
+    'normal': 'general',
+    'all': 'general',
+}
+
 
 def minimax_api_key_for(env: Dict[str, str], api_url: str) -> str:
     if 'api.minimax.io' in api_url.casefold():
@@ -134,6 +148,7 @@ class MiniMaxAnalysisRecord(Record):
     content: Optional[str] = None
     matched_keywords: str
     keyword_group: str = 'general'
+    ai_route_group: Optional[str] = None
     push_reason: str
     ai_confidence: float
     ai_summary: Optional[str] = None
@@ -186,6 +201,8 @@ class MiniMaxAnalyzeEntity(QueueActionEntity):
     """keyword file used to report matched keywords to the model and final notification"""
     keyword_group: str = 'general'
     """routing group copied into analysis records, e.g. general, hk, tw, apec"""
+    ai_route_groups: Sequence[str] = Field(default_factory=lambda: ['svip', 'hk', 'tw', 'general'])
+    """allowed AI-selected route groups for ordinary keyword monitoring"""
     min_confidence: float = Field(default=0.65, ge=0, le=1)
     """minimum model confidence required to push"""
     analysis_mode: str = 'risk'
@@ -242,7 +259,7 @@ class MiniMaxAnalyzeAction(QueueAction):
         elif entity.analysis_mode == 'apec_risk':
             payload = self.build_apec_risk_payload(record, keywords)
         else:
-            payload = self.build_payload(record, keywords)
+            payload = self.build_payload(record, keywords, entity)
         response = await asyncio.to_thread(self.call_minimax, payload)
 
         if entity.analysis_mode == 'profile_update':
@@ -262,6 +279,11 @@ class MiniMaxAnalyzeAction(QueueAction):
 
         original = record.model_dump()
         observed_at = datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M:%S UTC+08:00')
+        ai_route_group = self.normalize_ai_route_group(
+            response.get('route_group') or response.get('channel_group') or response.get('team'),
+            entity.keyword_group,
+            entity.ai_route_groups,
+        )
         return MiniMaxAnalysisRecord(
             title=original.get('title'),
             summary=original.get('summary'),
@@ -275,6 +297,7 @@ class MiniMaxAnalyzeAction(QueueAction):
             content=original.get('content'),
             matched_keywords='、'.join(keywords) if keywords else '未明确返回',
             keyword_group=entity.keyword_group,
+            ai_route_group=ai_route_group,
             push_reason=reason,
             ai_confidence=confidence,
             source_name=entity.source_name or 'YouTube',
@@ -351,6 +374,18 @@ class MiniMaxAnalyzeAction(QueueAction):
             return fallback
         return text
 
+    @staticmethod
+    def normalize_ai_route_group(value: Any, fallback: str, allowed_groups: Sequence[str]) -> str:
+        allowed = {str(group).strip().casefold(): str(group).strip() for group in allowed_groups if str(group).strip()}
+        fallback_key = fallback.strip().casefold()
+        if fallback_key not in allowed:
+            allowed[fallback_key] = fallback.strip()
+        if value is None:
+            return allowed[fallback_key]
+        raw = str(value).strip().casefold()
+        normalized = AI_ROUTE_GROUP_ALIASES.get(raw, raw)
+        return allowed.get(normalized.casefold(), allowed[fallback_key])
+
     def profile_record(self, entity: MiniMaxAnalyzeEntity, record: Record, response: Dict[str, Any]) -> MiniMaxAnalysisRecord:
         original = record.model_dump()
         confidence = float(response.get('confidence') or 0)
@@ -386,9 +421,17 @@ class MiniMaxAnalyzeAction(QueueAction):
             source_name=source_name,
         )
 
-    def build_payload(self, record: Record, keywords: Sequence[str]) -> Dict[str, Any]:
+    def build_payload(self, record: Record, keywords: Sequence[str], entity: MiniMaxAnalyzeEntity) -> Dict[str, Any]:
         user_prompt = {
             'matched_keywords': list(keywords),
+            'keyword_source_group': entity.keyword_group,
+            'allowed_route_groups': list(entity.ai_route_groups),
+            'route_group_rules': {
+                'svip': '内容适合SVIP团队或测试/SVIP频道重点查看时使用',
+                'hk': '内容主要涉及香港、港独、香港政治或香港相关反华叙事时使用',
+                'tw': '内容主要涉及台湾、台独、台湾政治或台海相关反华叙事时使用',
+                'general': '内容是普通反华/辱华/分裂/煽动信息，但不明显归属HK或TW时使用',
+            },
             'youtube_record': json.loads(record.as_json()),
             'content_excerpt': record_text(record),
         }
@@ -402,7 +445,9 @@ class MiniMaxAnalyzeAction(QueueAction):
                         '而且内容本身确实存在反华、辱华、分裂中国、煽动敌意或明显负面攻击中国/中国人的倾向。'
                         '只根据标题、频道、摘要、发布时间和链接等可见信息判断；证据不足时不要推送。'
                         '只输出 JSON 对象，不要输出额外文字。字段：'
-                        'should_push(boolean), confidence(0到1), reason(中文，尽可能详细说明命中依据、语义判断和为什么应/不应推送)。'
+                        'should_push(boolean), confidence(0到1), '
+                        'route_group(必须从用户提供的 allowed_route_groups 中选择一个；用于决定最终推送频道), '
+                        'reason(中文，尽可能详细说明命中依据、语义判断、推荐 route_group 的原因和为什么应/不应推送)。'
                     ),
                 },
                 {'role': 'user', 'content': json.dumps(user_prompt, ensure_ascii=False)},

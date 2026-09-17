@@ -103,6 +103,7 @@ class YouTubeAgentRecord(Record):
     published_text: Optional[str] = None
     matched_keywords: str
     keyword_group: str = 'general'
+    ai_route_group: Optional[str] = None
     push_reason: str
     ai_confidence: float = 0
     risk_level: str = '关注'
@@ -212,6 +213,7 @@ class YouTubeKeywordAgentsAction(Action):
         url = clean_text(data.get('url'), '未获取原始链接')
         matched = clean_text(data.get('matched_keywords'), '未明确返回')
         keyword_group = clean_text(data.get('keyword_group'), 'general')
+        ai_route_group = clean_text(data.get('ai_route_group'), keyword_group)
         reason = clean_text(data.get('push_reason'), '已命中关键词，建议人工复核原始链接。')
         confidence = float(data.get('ai_confidence') or 0)
         risk_level = self.risk_level(data, confidence)
@@ -236,6 +238,7 @@ class YouTubeKeywordAgentsAction(Action):
             published_text=data.get('published_text'),
             matched_keywords=matched,
             keyword_group=keyword_group,
+            ai_route_group=ai_route_group,
             push_reason=reason,
             ai_confidence=confidence,
             risk_level=risk_level,

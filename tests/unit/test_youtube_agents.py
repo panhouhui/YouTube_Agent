@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from avtdl.core.config import SettingsSection
 from avtdl.core.interfaces import OpaqueRecord
 from avtdl.core.runtime import MessageBus, RuntimeContext, TasksController
+from avtdl.plugins.minimax.analyze import MiniMaxAnalyzeAction, MiniMaxAnalyzeConfig, MiniMaxAnalyzeEntity
 from avtdl.plugins.mattermost.mattermost import MattermostAction, MattermostConfig, MattermostEntity
 from avtdl.plugins.youtube.agents import (
     YouTubeKeywordAgentEntity,
@@ -196,3 +197,22 @@ def test_mattermost_prefers_ai_route_group_with_keyword_group_fallback(tmp_path)
         entity,
         OpaqueRecord(keyword_group='tw', ai_route_group='unknown', url='https://example.com/fallback'),
     ) == ['a2']
+
+
+def test_apec_requires_direct_negative_china_evidence(tmp_path):
+    action = MiniMaxAnalyzeAction(
+        MiniMaxAnalyzeConfig(name='minimax.analyze', env_file=tmp_path / 'missing.env'),
+        [
+            MiniMaxAnalyzeEntity(
+                name='apec',
+                keywords_file=tmp_path / 'missing-keywords.txt',
+                keyword_group='apec',
+                analysis_mode='apec_risk',
+            )
+        ],
+        make_context(tmp_path),
+    )
+
+    assert not action.has_direct_negative_evidence('无')
+    assert not action.has_direct_negative_evidence('待核实')
+    assert action.has_direct_negative_evidence('标题直接指责中国在APEC中破坏地区秩序')

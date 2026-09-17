@@ -275,6 +275,12 @@ class MiniMaxAnalyzeAction(QueueAction):
             return None
 
         if entity.analysis_mode == 'apec_risk':
+            evidence = self.safe_analysis_text(response.get('china_negative_evidence'), '')
+            if not self.has_direct_negative_evidence(evidence):
+                self.logger.debug(
+                    f'[{entity.name}] AI rejected APEC record {record!r}: missing direct negative China evidence, reason={reason}'
+                )
+                return None
             return self.apec_risk_record(entity, record, keywords, response, reason, confidence)
 
         original = record.model_dump()
@@ -373,6 +379,24 @@ class MiniMaxAnalyzeAction(QueueAction):
         if any(term.casefold() in folded for term in FORBIDDEN_ANALYSIS_TERMS):
             return fallback
         return text
+
+    @staticmethod
+    def has_direct_negative_evidence(value: str) -> bool:
+        text = value.strip().casefold()
+        if not text:
+            return False
+        weak_values = {
+            '待核实',
+            '无',
+            '没有',
+            '未见',
+            '未明确',
+            'none',
+            'n/a',
+            'not found',
+            'no direct evidence',
+        }
+        return text not in weak_values
 
     @staticmethod
     def normalize_ai_route_group(value: Any, fallback: str, allowed_groups: Sequence[str]) -> str:
@@ -494,14 +518,19 @@ class MiniMaxAnalyzeAction(QueueAction):
                 {
                     'role': 'system',
                     'content': (
-                        '你是 APEC 公开内容风险研判助手。先判断给定 YouTube 视频是否存在明确的反华、'
-                        '辱华、分裂中国、煽动敌意或明显负面攻击中国/中国人的倾向；证据不足时不要推送。'
+                        '你是 APEC 对华负面舆情筛选员。只筛选 APEC 相关内容中明确发表对中国不利、'
+                        '负面、攻击、抹黑、指责、制裁、围堵、唱衰中国或煽动反华/辱华/分裂中国的内容。'
+                        '如果内容是正面评价中国、介绍中国合作成果、普通会议议程、领导人会见、经贸合作、'
+                        '中性新闻报道、单纯提到中国或证据不足，必须返回 should_push=false。'
+                        '只有输入中能直接看到针对中国/中国人/中国政府/中国企业/中国立场的负面表述时，才可以推送。'
                         '只能依据输入中的标题、频道、摘要、发布时间、链接和内容摘录。'
                         '严禁虚构来源、发布时间、地点、人物、讨论量、增长率、媒体数量、跨平台传播、'
                         '传播阶段或未来趋势。输入未直接支持的内容必须写“待核实”。'
                         '不得提及任何大模型、云端服务或自身系统名称。'
                         '只输出 JSON 对象，不要输出额外文字。字段：'
                         'should_push(boolean), confidence(0到1), '
+                        'china_negative_evidence(中文，必须摘述输入中可见的对中国不利/负面/攻击依据；'
+                        '如果没有直接依据，必须填“无”并且 should_push=false), '
                         'risk_level(一般/关注/重要/重大，仅按可见证据分级), '
                         'risk_type(字符串数组，例如舆论/政治叙事/分裂言论；证据不足填待核实), '
                         'risk_narrative(中文，只说明输入中可直接看到的风险依据；'
